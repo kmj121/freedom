@@ -17,4 +17,10 @@
         id, knowledge_base_relate_project_id, file_name, begin_annotation, end_annotation, content
     </sql>
 
+    <!-- 根据knowledge_base_relate_project_id字段匹配查询 -->
+    <select id="selectByProjectId" resultType="com.roger.freedom.entity.KnowledgeBaseRelateProjectDetail">
+        select * from knowledge_base_relate_project_detail
+        where knowledge_base_relate_project_id = #{projectId}
+    </select>
+
 </mapper>

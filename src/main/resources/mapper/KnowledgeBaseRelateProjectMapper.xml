@@ -4,15 +4,21 @@
 
     <!-- 通用查询映射结果 -->
     <resultMap id="BaseResultMap" type="com.roger.freedom.entity.KnowledgeBaseRelateProject">
-        <id column="id" property="id" />
-        <result column="project_name" property="projectName" />
-        <result column="svn_url" property="svnUrl" />
-        <result column="project_path" property="projectPath" />
+        <id column="id" property="id"/>
+        <result column="project_name" property="projectName"/>
+        <result column="svn_url" property="svnUrl"/>
+        <result column="project_path" property="projectPath"/>
     </resultMap>
 
     <!-- 通用查询结果列 -->
     <sql id="Base_Column_List">
         id, project_name, svn_url, project_path
     </sql>
+
+    <select id="selectBySvnUrl" resultType="com.roger.freedom.entity.KnowledgeBaseRelateProject">
+        select *
+        from knowledge_base_relate_project
+        where svn_url = #{svnUrl} limit 1
+    </select>
 
 </mapper>
