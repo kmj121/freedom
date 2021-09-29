@@ -183,7 +183,7 @@ public class GitHubWebHookController {
                 List<String> subList = contentList.subList(beginIndex + 1, endIndex);
 
                 //list转String
-                String contentNew = StringUtils.join(subList.toArray(), "<-->");
+                String contentNew = StringUtils.join(subList.toArray(), "\\n");
                 String contentOld = item.getContent();
                 String md5New = new String(DigestUtils.md5Digest(contentNew.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
                 String md5Old = new String(DigestUtils.md5Digest(contentOld.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
@@ -269,8 +269,6 @@ public class GitHubWebHookController {
      * 当代码push到prod分支上，执行webhook脚本
      */
     public List<String> executeWebhookShell(String projectName, String webhookShellPath){
-//        String projectDir = "/Users/zhaosc/bob/proj_ccare";
-//        List<String> resultList = runCommand(gradleShellPath + " " + projectDir, new ResultProcessor() {
         List<String> resultList = runCommand(webhookShellPath, new ResultProcessor() {
             @Override
             public void process(List<String> textList, String text) {
@@ -295,7 +293,7 @@ public class GitHubWebHookController {
     }
 
     /**
-     * 功能：Java读取txt文件的内容
+     * 功能：Java读取文件的内容
      *      步骤：
      *          1：先获得文件句柄
      *          2：获得文件句柄当做是输入一个字节码流，需要对这个输入流进行读取
