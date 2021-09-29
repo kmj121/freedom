@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.roger.freedom.mapper.KnowledgeBaseRelateProjectDetailMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.roger.freedom.entity.KnowledgeBaseRelateProjectDetail">
+        <id column="id" property="id" />
+        <result column="knowledge_base_relate_project_id" property="knowledgeBaseRelateProjectId" />
+        <result column="file_name" property="fileName" />
+        <result column="begin_annotation" property="beginAnnotation" />
+        <result column="end_annotation" property="endAnnotation" />
+        <result column="content" property="content" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, knowledge_base_relate_project_id, file_name, begin_annotation, end_annotation, content
+    </sql>
+
+</mapper>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.roger.freedom.mapper.KnowledgeBaseRelateProjectMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.roger.freedom.entity.KnowledgeBaseRelateProject">
+        <id column="id" property="id" />
+        <result column="project_name" property="projectName" />
+        <result column="svn_url" property="svnUrl" />
+        <result column="project_path" property="projectPath" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, project_name, svn_url, project_path
+    </sql>
+
+</mapper>
