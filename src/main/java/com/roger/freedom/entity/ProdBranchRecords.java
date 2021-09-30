@@ -3,12 +3,14 @@ package com.roger.freedom.entity;
 import java.time.LocalDateTime;
 import com.baomidou.mybatisplus.annotation.TableField;
 import java.io.Serializable;
+import java.util.Date;
+
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 /**
  * <p>
- * 
+ * 记录每次提交到prod上的内容
  * </p>
  *
  * @author kmj123
@@ -26,25 +28,29 @@ public class ProdBranchRecords implements Serializable {
       private Integer id;
 
     /**
-     * merge id
+     * merge之前的id
      */
-    private String mergeId;
+    private String before;
 
     /**
-     * 所有commitId，用逗号隔开
+     * merge之后的id
      */
-    @TableField("commitIds")
-    private String commitIds;
+    private String after;
 
     /**
-     * 点击merge的时间
+     * merge中包含的commit id
      */
-    private String mergeTime;
+    private String commitId;
+
+    /**
+     * 此提交是否与之前推送的任何提交不同，0:false 1:true
+     */
+    private Integer distinct;
 
     /**
      * 创建时间
      */
-    private LocalDateTime createTime;
+    private Date createTime;
 
 
 }

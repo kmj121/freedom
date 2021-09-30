@@ -7,7 +7,7 @@ import lombok.EqualsAndHashCode;
 
 /**
  * <p>
- * 
+ * 记录每次提交到master上的并且对知识库维护内容有改动的内容
  * </p>
  *
  * @author kmj123
@@ -48,6 +48,11 @@ public class MasterBranchRecords implements Serializable {
      * 创建时间
      */
     private LocalDateTime createTime;
+
+    /**
+     * commit的时间戳
+     */
+    private Integer timestamp;
 
 
 }

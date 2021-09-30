@@ -4,9 +4,13 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.roger.freedom.entity.KnowledgeBaseRelateProject;
 import com.roger.freedom.entity.KnowledgeBaseRelateProjectDetail;
+import com.roger.freedom.entity.MasterBranchRecords;
+import com.roger.freedom.entity.ProdBranchRecords;
 import com.roger.freedom.service.ResultProcessor;
 import com.roger.freedom.service.impl.KnowledgeBaseRelateProjectDetailServiceImpl;
 import com.roger.freedom.service.impl.KnowledgeBaseRelateProjectServiceImpl;
+import com.roger.freedom.service.impl.MasterBranchRecordsServiceImpl;
+import com.roger.freedom.service.impl.ProdBranchRecordsServiceImpl;
 import io.swagger.annotations.Api;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -35,6 +39,12 @@ public class GitHubWebHookController {
 
     @Autowired
     private KnowledgeBaseRelateProjectDetailServiceImpl projectDetailService;
+
+    @Autowired
+    private ProdBranchRecordsServiceImpl prodBranch;
+
+    @Autowired
+    private MasterBranchRecordsServiceImpl masterBranch;
 
     @PostMapping("/webhook2")
     public void webhook2(HttpServletRequest request) {
@@ -101,20 +111,48 @@ public class GitHubWebHookController {
     @PostMapping("/webhook")
     public void webhook(HttpServletRequest request) {
         /**
-         * 1. 代码上生产，webhook通知
+         * 1. 获取webhook传入参数
          */
         JSONObject jsonObject = getParamsIntoJsonObject(request);
+        // 校验参数
+        if (jsonObject == null) {
+            checkNotify("webhook传入参数错误，request中取出json为null");
+            return;
+        }
         System.out.println(jsonObject.toJSONString());
-
         /**
          * 一层数据
          */
         // 仓库信息
         JSONObject repository = jsonObject.getJSONObject("repository");
+        // 校验参数
+        if (repository == null) {
+            checkNotify("webhook传入参数错误，request中取出json中repository为null");
+            return;
+        }
         // 分支名称
         String ref = jsonObject.getOrDefault("ref", "").toString();
+        // 校验参数
+        if (StringUtils.isBlank(ref)) {
+            checkNotify("webhook传入参数错误，request中取出json中ref参数错误");
+            return;
+        }
         System.out.println("ref=" + ref);
-
+        // commit信息：用户的每次提交，以及merge也作为一次提交，区别在于commits[][distinct]值，如果是merge，则为true，否则为false
+        JSONArray commitsJsonArray = jsonObject.getJSONArray("commits");
+        // 校验参数
+        if (checkCommits(commitsJsonArray)) {
+            checkNotify("webhook传入参数错误，request中取出json中commits参数错误");
+            return;
+        }
+        String before = jsonObject.getOrDefault("before", "").toString();
+        String after = jsonObject.getOrDefault("after", "").toString();
+        // 校验参数
+        if (StringUtils.isBlank(before) || StringUtils.isBlank(after)) {
+            checkNotify("webhook传入参数错误，request中取出json中before/after参数错误，before=" + before + "，after=" + after);
+            return;
+        }
+        System.out.println("before=" + before + ",after=" + after);
         /**
          * 二层数据
          */
@@ -124,117 +162,151 @@ public class GitHubWebHookController {
         // 仓库url地址，例如：https://github.com/kmj121/demo
         String svnUrl = repository.getOrDefault("svn_url", "").toString();
         System.out.println("svnUrl=" + svnUrl);
-
-        // 校验gitlab传过来的参数
-        if (StringUtils.isBlank(ref) || StringUtils.isBlank(name) || StringUtils.isBlank(svnUrl)) {
-            System.out.println("webhook传入参数错误，ref=" + ref + ", name=" + name + ", svnUrl" + svnUrl);
-            // todo 邮件通知，webhook传入参数错误
-            return;
-        }
-        if (!ref.equals("refs/heads/prod")) {
-            System.out.println("不是prod分支，不做处理，ref=" + ref);
+        if (StringUtils.isBlank(name) || StringUtils.isBlank(svnUrl)) {
+            checkNotify("webhook传入参数错误，request中取出json中repository下name/svn_url参数错误，name=" + name + ", svnUrl" + svnUrl);
             return;
         }
 
-        // 根据svn_url判断项目是否在知识库维护范围内，如果在，则去拉取最新代码，没有不在，则return
+        // 判断是否为prod分支或者master分支，如果不是，不作处理
+        if (!ref.equals("refs/heads/prod") && !ref.equals("refs/heads/master")) {
+            // todo 打log
+            System.out.println("不是prod或者master分支，不做处理，ref=" + ref);
+            return;
+        }
+
+        // 通过svn_url判断项目是否在知识库维护范围内，如果不在，不作处理
         KnowledgeBaseRelateProject project = projectService.selectBySvnUrl(svnUrl);
         if (project == null) {
+            // todo 打log
             System.out.println("项目不在维护范围内");
             return;
         }
 
         /**
-         * git拉去代码，shell脚本打印的内容：
-         *      没有拉取到（网络不稳定或者其他原因）：
-         *          Hi, demo
-         *          cd /Users/kanmeijie/Desktop/demo
-         *          Your branch is up to date with 'origin/prod'.
-         *          Script execution complete
-         *      拉取到：
-         *          Hi, demo
-         *          cd /Users/kanmeijie/Desktop/demo
-         *          Your branch is up to date with 'origin/prod'.
-         *          Updating d479107..c849b0a
-         *          Fast-forward
-         *          README.md | 2 ++
-         *          1 file changed, 2 insertions(+)
-         *          Script execution complete
+         * 针对master分支和prod分支进行响应逻辑处理：
          *
-         * 所以根据返回结果中是否有"Fast-forward"内容，来判断是否拉取到最新代码，三次重试机制
+         *  master分支：
+         *      1. 执行脚本，拉取gitlab最新代码
+         *      2. 根据维护中的项目名、文件名、文件中的开始标志、文件中的结束标志 去代码文件夹中搜索，
+         *         搜索到，则截取开始标志与结束标志之间的内容，与原内容进行比较，如果有改动，则更新到
+         *         数据库中，如果数据库中原来存放截取内容的字段为空，则说明是第一次将截取内容存放到表中。
+         *  prod分支：
+         *      1. 将每次提交都记录到表中
          */
-        // 脚本存放的路径
-        String webhookShellPath = "/Users/kanmeijie/Desktop/webhook.sh";
-        List<String> shellResultList = new ArrayList<>();
-        // 三次重试
-        Boolean flag = null;
-        for (int i = 0; i < 3; i++) {
-            flag = true;
-            shellResultList = executeWebhookShell(project.getProjectName(), webhookShellPath);
-            if (!CollectionUtils.isEmpty(shellResultList) && shellResultList.contains("Fast-forward")) {
-                break;
-            } else {
-                flag = false;
-            }
-        }
-        logList(shellResultList);
-        // 如果三次重试，仍然失败，则发送邮件通知
-        if (!flag) {
-            // todo 邮件通知，三次重试，仍然无法拉取到最新代码
-            System.out.println("邮件通知，三次重试，仍然无法拉取到最新代码");
-            return;
-        }
 
-        // 查询knowledge_base_relate_project_detail表，获取项目下维护的文件名
-        List<KnowledgeBaseRelateProjectDetail> detailList = projectDetailService.selectByProjectId(project.getId());
-        // 遍历
-        for (KnowledgeBaseRelateProjectDetail item : detailList) {
-            File file = new File(item.getFileName());
-            if (!file.exists() || !file.isFile()) {
-                // todo 邮件通知，维护的文件不存在，可能被删除了
-                System.out.println("邮件通知，维护的文件不存在，可能被删除了");
-                continue;
+        /**
+         * 问题：
+         * 1. 一次拉取的可能是多次commit的内容，没有办法确定是哪次commit去做的目标文件的修改，所以无法确定修改人。
+         *
+         * 目前只能实现，检测到目标文件有改动，通知管理员去更新知识库。
+         */
+        // 如果是master分支
+        if (ref.equals("refs/heads/master")) {
+            // 脚本存放的路径
+            String webhookShellPath = "/Users/kanmeijie/Desktop/webhook.sh";
+            List<String> shellResultList = new ArrayList<>();
+            /**
+             * 待解决：（拉取时有可能两次merge一次性拉取下来，当第一个merge拉取没有成功，然后有一个merge过来，此时第二次重试会拉取两次需要merge的代码）
+             *
+             * 三次重试机制以及判断是否需要重试说明：
+             *
+             * git拉去代码，shell脚本打印的内容：
+             *      没有拉取到（网络不稳定或者其他原因）：
+             *          Hi, demo
+             *          cd /Users/kanmeijie/Desktop/demo
+             *          Your branch is up to date with 'origin/prod'.
+             *          Script execution complete
+             *      拉取到：
+             *          Hi, demo
+             *          cd /Users/kanmeijie/Desktop/demo
+             *          Your branch is up to date with 'origin/prod'.
+             *          Updating d479107..c849b0a
+             *          Fast-forward
+             *          README.md | 2 ++
+             *          1 file changed, 2 insertions(+)
+             *          Script execution complete
+             *
+             * 所以根据返回结果中是否有"Fast-forward"内容，来判断是否拉取到最新代码，
+             */
+            // 三次重试
+            Boolean flag = null;
+            for (int i = 0; i < 3; i++) {
+                flag = true;
+                shellResultList = executeWebhookShell(project.getProjectName(), webhookShellPath);
+                if (!CollectionUtils.isEmpty(shellResultList) && shellResultList.contains("Fast-forward")) {
+                    break;
+                } else {
+                    flag = false;
+                }
             }
-            // todo 读取文件内容
-            Map resultMap = readFileIntoStringArrList(file);
-            // 读取内容出错
-            if ("9999".equals(resultMap.get("code"))) {
-                // todo 邮件通知，读取内容出错
-                System.out.println("邮件通知，读取内容出错");
-                continue;
+            logList(shellResultList);
+            // 如果三次重试，仍然失败，则发送邮件通知
+            if (!flag) {
+                // todo 邮件通知，三次重试，仍然无法拉取到最新代码
+                System.out.println("邮件通知，三次重试，仍然无法拉取到最新代码");
+                return;
             }
-            // 内容为空
-            List<String> contentList = (List<String>) resultMap.get("content");
-            if (CollectionUtils.isEmpty(contentList)) {
-                // todo 邮件通知，内容为空
-                System.out.println("邮件通知，内容为空");
-                continue;
-            }
-            List<String> beginList = contentList.stream().filter(u -> u.equals(item.getBeginAnnotation())).collect(Collectors.toList());
-            List<String> endList = contentList.stream().filter(u -> u.equals(item.getEndAnnotation())).collect(Collectors.toList());
-            // 校验开始标志结束标志
-            if (CollectionUtils.isEmpty(beginList) || beginList.size() > 1
-                    || CollectionUtils.isEmpty(endList) || endList.size() > 1) {
-                // todo 邮件通知，开始标志/结束标志有问题，可能不存在，或者存在多个
-                System.out.println("邮件通知，开始标志/结束标志有问题，可能不存在，或者存在多个");
-                continue;
-            }
-            // 截取开始标志和结束标志之间的内容(左闭右开)，与数据库的进行比对
-            Integer beginIndex = contentList.indexOf(beginList.get(0));
-            Integer endIndex = contentList.indexOf(endList.get(0));
-            List<String> subList = contentList.subList(beginIndex + 1, endIndex);
 
-            //list转String
-            String contentNew = StringUtils.join(subList.toArray(), "\\n");
-            String contentOld = item.getContent();
-            String md5New = new String(DigestUtils.md5Digest(contentNew.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
-            String md5Old = new String(DigestUtils.md5Digest(contentOld.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
-            if (!md5New.equals(md5Old)) {
-                // todo 邮件通知，知识库维护内容发生了改变（邮件中写出新的内容和老的内容），并将新的内容更新到数据库
-                System.out.println("邮件通知，知识库维护内容发生了改变（邮件中写出新的内容和老的内容），并将新的内容更新到数据库");
-                item.setContent(contentNew);
-                projectDetailService.updateOne(item);
-            } else {
-                System.out.println("=========over==========");
+            // 查询knowledge_base_relate_project_detail表，获取项目下维护的文件名
+            List<KnowledgeBaseRelateProjectDetail> detailList = projectDetailService.selectByProjectId(project.getId());
+            // 遍历
+            for (KnowledgeBaseRelateProjectDetail item : detailList) {
+                File file = new File(item.getFileName());
+                if (!file.exists() || !file.isFile()) {
+                    // todo 邮件通知，维护的文件不存在，可能被删除了
+                    System.out.println("邮件通知，维护的文件不存在，可能被删除了");
+                    continue;
+                }
+                // todo 读取文件内容
+                Map resultMap = readFileIntoStringArrList(file);
+                // 读取内容出错
+                if ("9999".equals(resultMap.get("code"))) {
+                    // todo 邮件通知，读取内容出错
+                    System.out.println("邮件通知，读取内容出错");
+                    continue;
+                }
+                // 内容为空
+                List<String> contentList = (List<String>) resultMap.get("content");
+                if (CollectionUtils.isEmpty(contentList)) {
+                    // todo 邮件通知，内容为空
+                    System.out.println("邮件通知，内容为空");
+                    continue;
+                }
+                List<String> beginList = contentList.stream().filter(u -> u.equals(item.getBeginAnnotation())).collect(Collectors.toList());
+                List<String> endList = contentList.stream().filter(u -> u.equals(item.getEndAnnotation())).collect(Collectors.toList());
+                // 校验开始标志结束标志
+                if (CollectionUtils.isEmpty(beginList) || beginList.size() > 1
+                        || CollectionUtils.isEmpty(endList) || endList.size() > 1) {
+                    // todo 邮件通知，开始标志/结束标志有问题，可能不存在，或者存在多个
+                    System.out.println("邮件通知，开始标志/结束标志有问题，可能不存在，或者存在多个");
+                    continue;
+                }
+                // 截取开始标志和结束标志之间的内容(左闭右开)，与数据库的进行比对
+                Integer beginIndex = contentList.indexOf(beginList.get(0));
+                Integer endIndex = contentList.indexOf(endList.get(0));
+                List<String> subList = contentList.subList(beginIndex + 1, endIndex);
+
+                //list转String
+                String contentNew = StringUtils.join(subList.toArray(), "\\n");
+                String contentOld = item.getContent();
+                String md5New = new String(DigestUtils.md5Digest(contentNew.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
+                String md5Old = new String(DigestUtils.md5Digest(contentOld.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
+                if (!md5New.equals(md5Old)) {
+                    // todo 邮件通知，知识库维护内容发生了改变（邮件中写出新的内容和老的内容），并将新的内容更新到数据库
+                    System.out.println("邮件通知，知识库维护内容发生了改变（邮件中写出新的内容和老的内容），并将新的内容更新到数据库");
+                    item.setContent(contentNew);
+                    projectDetailService.updateOne(item);
+                }
+            }
+        } else { // prod分支
+            for (Object item : commitsJsonArray) {
+                ProdBranchRecords prodBranchRecords = new ProdBranchRecords();
+                prodBranchRecords.setBefore(before);
+                prodBranchRecords.setAfter(after);
+                prodBranchRecords.setCommitId(((JSONObject) item).getOrDefault("id", "").toString());
+                prodBranchRecords.setDistinct((Boolean) ((JSONObject) item).get("distinct") == true ? 1 : 0);
+                prodBranchRecords.setCreateTime(new Date());
+                prodBranch.insert(prodBranchRecords);
             }
         }
     }
@@ -375,6 +447,31 @@ public class GitHubWebHookController {
         }
 
         return map;
+    }
+
+    public Boolean checkCommits(JSONArray commitsJsonArray) {
+        if (CollectionUtils.isEmpty(commitsJsonArray)) {
+            return false;
+        }
+        for (Object item : commitsJsonArray) {
+            JSONObject commitJsonObject = (JSONObject) item;
+            String commitId = commitJsonObject.getOrDefault("id", "").toString();
+            Boolean distinct = (Boolean) commitJsonObject.get("distinct");
+            if (StringUtils.isBlank(commitId)) {
+                // todo commitId错误
+                return false;
+            }
+            if (distinct == null) {
+                // todo distinct错误
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public void checkNotify(String errorMsg) {
+        // todo 邮件通知
+        System.out.println(errorMsg);
     }
 
     /**
