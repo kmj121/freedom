@@ -10,4 +10,5 @@ begin_annotation_freedom
 888888888888
 12
 34
+56
 end_annotation_freedom
