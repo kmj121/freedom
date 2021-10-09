@@ -30,9 +30,9 @@ jobs:
           server_address: smtp.163.com
           server_port: 465
           # 这些sectret的环境变量需要配置在setting中的secret下
-          username: ${<!-- -->{<!-- --> secrets.MAIL_USERNAME }}
-          password: ${<!-- -->{<!-- --> secrets.MAIL_PASSWORD }}
-          subject: 天气预报 (${<!-- -->{<!-- -->env.REPORT_DATE}})
+          username: ${{secrets.MAIL_USERNAME}}
+          password: ${{secrets.MAIL_PASSWORD}}
+          subject: 天气预报 (${{env.REPORT_DATE}})
           body: file://result.html
           to: 18356975161@163.com
           from: GitHub Actions
