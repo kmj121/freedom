@@ -265,7 +265,7 @@ public class GitHubWebHookController {
                 Map resultMap = readFileIntoStringArrList(file);
                 // 读取内容出错
                 if ("9999".equals(resultMap.get("code"))) {
-                    // todo 邮件通知，读取内容出错
+                    // todo 邮件通知，读取内容出错...
                     System.out.println("邮件通知，读取内容出错");
                     continue;
                 }
