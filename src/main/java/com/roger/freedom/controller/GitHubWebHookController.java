@@ -196,9 +196,13 @@ public class GitHubWebHookController {
 
         /**
          * 问题：
-         * 1. 一次拉取的可能是多次commit的内容，没有办法确定是哪次commit去做的目标文件的修改，所以无法确定修改人。
+         * 1. 一次拉取的可能是多次commit的内容，没有办法确定是哪次commit去做的目标文件的修改，所以无法确定修改人。只能通过
+         * 管理员手动去选中被改动方法所有内容，右键 -> Git -> Show History for Selection，查看具体修改人。
          *
          * 目前只能实现，检测到目标文件有改动，通知管理员去更新知识库。
+         *
+         * 寻求解决方案：
+         * 1. github能不能感知自定义的内容发生变化，通过接口通知出来？这样就可以定位到最小的提交单元，即一个commit。
          */
         // 如果是master分支
         if (ref.equals("refs/heads/master")) {
