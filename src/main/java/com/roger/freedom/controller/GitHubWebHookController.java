@@ -272,7 +272,7 @@ public class GitHubWebHookController {
                 // 内容为空
                 List<String> contentList = (List<String>) resultMap.get("content");
                 if (CollectionUtils.isEmpty(contentList)) {
-                    // todo 邮件通知，内容为空
+                    // todo 邮件通知，内容为空...
                     System.out.println("邮件通知，内容为空");
                     continue;
                 }
