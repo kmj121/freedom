@@ -56,7 +56,7 @@ public class GitHubWebHookController {
     /**
      * 初始化操作：
      * # 1. 切换到放代码的目录下
-     * cd /root/base/code/code
+     *   cd /root/base/code/code
      * # 2. clone，拉取下来所有分支的代码到本地仓库，并且默认拉取master分支代码到本地工作区，并且创建本地master分支
      * git clone http://kanmeijie:kmj123456@17zhiliao.com:8088/bgcheck/ewe-bgcheck.git
      * # 3. 进入git项目
