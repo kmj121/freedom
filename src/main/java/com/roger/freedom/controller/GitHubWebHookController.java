@@ -62,7 +62,7 @@ public class GitHubWebHookController {
      * # 3. 进入git项目
      *   cd ewe-bgcheck
      * # 4. 从本地仓库拉取远程prod分支的代码，并创建本地分支prod
-     * git checkout -b prod origin/prod
+     *   git checkout -b prod origin/prod
      *
      * @param request
      */
