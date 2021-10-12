@@ -269,8 +269,8 @@ public class GitHubWebHookController {
                     projectDetailService.updateOne(item);
                 } else if (!md5New.equals(md5Old)) {
                     // 邮件通知，知识库维护内容发生了改变（邮件中写出改变的内容所在的具体文件路径（路径中包含项目的文件夹）），并将新的内容更新到数据库
-                    mailUtil.sendMail("18516314504@163.com", "知识库维护内容发生了改变", "文件所在服务器路径：" + item.getFileName());
-                    LOG.info("知识库维护内容发生了改变，文件所在服务器路径：" + item.getFileName());
+                    mailUtil.sendMail("18516314504@163.com", "知识库维护内容发生了改变", "知识库维护内容发生了改变，文件所在服务器路径：" + item.getFileName() + "，开始标志：" + item.getBeginAnnotation() + "，结束标志：" + item.getEndAnnotation());
+                    LOG.info("知识库维护内容发生了改变，文件所在服务器路径：" + item.getFileName() + "，开始标志：" + item.getBeginAnnotation() + "，结束标志：" + item.getEndAnnotation());
                     item.setContent(contentNew);
                     projectDetailService.updateOne(item);
                 }
@@ -285,7 +285,6 @@ public class GitHubWebHookController {
                 prodBranchRecords.setDistinct((Boolean) ((JSONObject) item).get("distinct") == true ? 1 : 0);
                 prodBranchRecords.setCreateTime(new Date());
                 prodBranch.insert(prodBranchRecords);
-
             }
             // end annotation freedom 111
         }
