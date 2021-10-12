@@ -314,20 +314,16 @@ public class GitHubWebHookController {
 
             Process pro = Runtime.getRuntime().exec(cmd);
             pro.waitFor();
-
-            InputStream in = pro.getInputStream();
             Long time2 = System.currentTimeMillis();
             System.out.println("======执行shell脚本结束时间：" + time2);
             System.out.println("======执行shell脚本花费时间：" + (time2 - time1));
+
+            InputStream in = pro.getInputStream();
             BufferedReader read = new BufferedReader(new InputStreamReader(in));
             String line = null;
-            System.out.println("======处理shell脚本返回数据开始时间：" + time2);
             while ((line = read.readLine()) != null) {
                 processor.process(resultList, line);
             }
-            Long time3 = System.currentTimeMillis();
-            System.out.println("======处理shell脚本返回数据结束时间：" + time3);
-            System.out.println("======处理shell脚本返回数据花费时间：" + (time3 - time2));
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
