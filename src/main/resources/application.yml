@@ -19,6 +19,30 @@ spring:
       date-format: yyyy-MM-dd HH:mm:ss
       time-zone: GMT+8
 
+  # 如果使用端口为465，将protocol的smtp改为smtps
+  #将配置文件端口改为587，则可以使用smtp。
+  #均为SSL连接端口，因为qq不支持非SSL端口。
+  #以下是配置文件，重点在于protocal（视端口而定）和开启SSL（必须）
+  mail:
+    # 字符集编码 默认 UTF-8
+    default-encoding: UTF-8
+    # SMTP 服务器 host  qq邮箱的为 smtp.qq.com 端口 465 587
+    host: smtp.exmail.qq.com
+    # SMTP 服务器端口 不同的服务商不一样
+    port: 465
+    # SMTP 服务器使用的协议
+    protocol: smtps
+    # 发送端的用户邮箱名
+    username: kanmeijie@17zhiliao.com
+    # 发送端的密码
+    password: Kmj08171658
+    # 设置开启ssl
+    properties:
+      mail:
+        stmp:
+          ssl:
+            enable: true
+
 # Mybatis-Plus配置
 mybatis-plus:
   # 如果是放在src/main/java目录下 classpath:/com/roger/*/mapper/*Mapper.xml # 如果是放在resource目录 classpath:/mapper/*Mapper.xml mapper-locations: classpath*:com/roger/**/**.xml,classpath*:mapper/*.xml

@@ -11,10 +11,13 @@ import com.roger.freedom.service.impl.KnowledgeBaseRelateProjectDetailServiceImp
 import com.roger.freedom.service.impl.KnowledgeBaseRelateProjectServiceImpl;
 import com.roger.freedom.service.impl.MasterBranchRecordsServiceImpl;
 import com.roger.freedom.service.impl.ProdBranchRecordsServiceImpl;
+import com.roger.freedom.utils.MailUtil;
 import io.swagger.annotations.Api;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
@@ -33,6 +36,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/github")
 @Slf4j
 public class GitHubWebHookController {
+    private static final Logger LOG = LoggerFactory.getLogger(GitHubWebHookController.class);
 
     @Autowired
     private KnowledgeBaseRelateProjectServiceImpl projectService;
@@ -46,54 +50,8 @@ public class GitHubWebHookController {
     @Autowired
     private MasterBranchRecordsServiceImpl masterBranch;
 
-    @PostMapping("/webhook2")
-    public void webhook2(HttpServletRequest request) {
-        JSONObject jsonObject = getParamsIntoJsonObject(request);
-        System.out.println(jsonObject.toJSONString());
-        List list = new ArrayList<>();
-        list.add("https://github.com/kmj121/demo");
-
-        // 一层数据
-        JSONObject repository = jsonObject.getJSONObject("repository");
-        String ref = jsonObject.getOrDefault("ref", "").toString();
-        System.out.println("ref=" + ref);
-        JSONArray commitsJSONArray = jsonObject.getJSONArray("commits");
-        String after = jsonObject.getOrDefault("after", "").toString();
-
-        // 二层数据
-        String svnUrl = repository.getOrDefault("svn_url", "").toString();
-        System.out.println("svnUrl=" + svnUrl);
-
-        // 匹配仓库Url（repository.svn_url）
-        if (StringUtils.isNotBlank(svnUrl) && list.contains(svnUrl)) {
-            //分支名ref，refs/heads/prod
-            if (StringUtils.isNotBlank(ref) && ref.equals("refs/heads/prod")) {
-                if (commitsJSONArray == null || commitsJSONArray.size() == 0) {
-                    System.out.println("commitsJSONArray为空");
-                    return;
-                }
-                for (int i=0; i<commitsJSONArray.size(); i++) {
-                    JSONArray modifyJsonArray = commitsJSONArray.getJSONObject(i).getJSONArray("modified");
-                    if (modifyJsonArray == null || modifyJsonArray.size() == 0) {
-                        System.out.println("modifyJsonArray为空");
-                        continue;
-                    }
-                    // 匹配修改的文件
-                    for (int j=0; j<modifyJsonArray.size(); j++) {
-                        String modifyFileName = modifyJsonArray.get(i).toString();
-                        System.out.println("modifyFileName=" + modifyFileName);
-                        // todo 多个文件，需要修改
-                        if (StringUtils.isNotBlank(modifyFileName) && modifyFileName.equals("README.md")) {
-                            // 邮件发送svnUrl,commitId,modifyFileName
-                            String title = "知识库维护的方法所在文件有改动";
-                            String content = "git仓库url:" + svnUrl + ", 分支:" + ref + ", commitId:" + after + ", 修改的文件名:" + modifyFileName;
-                            System.out.println("邮件发送，title=" + title + ", content=" + content);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    @Autowired
+    private MailUtil mailUtil;
 
     /**
      * 初始化操作：
@@ -169,16 +127,14 @@ public class GitHubWebHookController {
 
         // 判断是否为prod分支或者master分支，如果不是，不作处理
         if (!ref.equals("refs/heads/prod") && !ref.equals("refs/heads/master")) {
-            // todo 打log
-            System.out.println("不是prod或者master分支，不做处理，ref=" + ref);
+            LOG.info("不是prod或者master分支，不做处理，ref=" + ref);
             return;
         }
 
         // 通过svn_url判断项目是否在知识库维护范围内，如果不在，不作处理
         KnowledgeBaseRelateProject project = projectService.selectBySvnUrl(svnUrl);
         if (project == null) {
-            // todo 打log
-            System.out.println("项目不在维护范围内");
+            LOG.info("项目：" + name +"，不在维护范围内");
             return;
         }
 
@@ -246,8 +202,9 @@ public class GitHubWebHookController {
             logList(shellResultList);
             // 如果三次重试，仍然失败，则发送邮件通知
             if (!flag) {
-                // todo 邮件通知，三次重试，仍然无法拉取到最新代码
-                System.out.println("邮件通知，三次重试，仍然无法拉取到最新代码");
+                // 邮件通知，三次重试，仍然无法拉取到最新代码
+                mailUtil.sendMail("18516314504@163.com", "git拉取最新代码出错", "三次重试，仍然无法拉取到最新代码");
+                LOG.info("三次重试，仍然无法拉取到最新代码");
                 return;
             }
 
@@ -257,32 +214,37 @@ public class GitHubWebHookController {
             for (KnowledgeBaseRelateProjectDetail item : detailList) {
                 File file = new File(item.getFileName());
                 if (!file.exists() || !file.isFile()) {
-                    // todo 邮件通知，维护的文件不存在，可能被删除了
-                    System.out.println("邮件通知，维护的文件不存在，可能被删除了");
+                    // 邮件通知，维护的文件不存在，可能被删除了
+                    mailUtil.sendMail("18516314504@163.com", "维护的文件不存在", "维护的文件不存在，可能被删除了");
+                    LOG.info("维护的文件不存在，可能被删除了");
                     continue;
                 }
                 // todo 读取文件内容
                 Map resultMap = readFileIntoStringArrList(file);
                 // 读取内容出错
                 if ("9999".equals(resultMap.get("code"))) {
-                    // todo 邮件通知，读取内容出错...
-                    System.out.println("邮件通知，读取内容出错");
+                    // 邮件通知，读取文件内容出错
+                    mailUtil.sendMail("18516314504@163.com", "读取文件内容出错", "读取文件内容出错");
+                    LOG.info("读取文件内容出错");
                     continue;
                 }
                 // 内容为空
                 List<String> contentList = (List<String>) resultMap.get("content");
                 if (CollectionUtils.isEmpty(contentList)) {
-                    // todo 邮件通知，内容为空...
-                    System.out.println("邮件通知，内容为空");
+                    // 邮件通知，文件内容为空
+                    mailUtil.sendMail("18516314504@163.com", "读取文件内容为空", "读取文件内容为空");
+                    LOG.info("读取文件内容为空");
                     continue;
                 }
+                // 确保每一个标志都是唯一的
                 List<String> beginList = contentList.stream().filter(u -> u.equals(item.getBeginAnnotation())).collect(Collectors.toList());
                 List<String> endList = contentList.stream().filter(u -> u.equals(item.getEndAnnotation())).collect(Collectors.toList());
                 // 校验开始标志结束标志
                 if (CollectionUtils.isEmpty(beginList) || beginList.size() > 1
                         || CollectionUtils.isEmpty(endList) || endList.size() > 1) {
-                    // todo 邮件通知，开始标志/结束标志有问题，可能不存在，或者存在多个
-                    System.out.println("邮件通知，开始标志/结束标志有问题，可能不存在，或者存在多个");
+                    // 邮件通知，开始标志/结束标志有问题，可能不存在，或者存在多个
+                    mailUtil.sendMail("18516314504@163.com", "开始标志/结束标志错误", "开始标志/结束标志错误，可能不存在，或者存在多个");
+                    LOG.info("开始标志/结束标志错误，可能不存在，或者存在多个");
                     continue;
                 }
                 // 截取开始标志和结束标志之间的内容(左闭右开)，与数据库的进行比对
@@ -296,13 +258,15 @@ public class GitHubWebHookController {
                 String md5New = new String(DigestUtils.md5Digest(contentNew.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
                 String md5Old = new String(DigestUtils.md5Digest(contentOld.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
                 if (!md5New.equals(md5Old)) {
-                    // todo 邮件通知，知识库维护内容发生了改变（邮件中写出新的内容和老的内容），并将新的内容更新到数据库
-                    System.out.println("邮件通知，知识库维护内容发生了改变（邮件中写出新的内容和老的内容），并将新的内容更新到数据库");
+                    // 邮件通知，知识库维护内容发生了改变（邮件中写出改变的内容所在的具体文件路径（路径中包含项目的文件夹）），并将新的内容更新到数据库
+                    mailUtil.sendMail("18516314504@163.com", "知识库维护内容发生了改变", "文件所在服务器路径：" + item.getFileName());
+                    LOG.info("知识库维护内容发生了改变，文件所在服务器路径：" + item.getFileName());
                     item.setContent(contentNew);
                     projectDetailService.updateOne(item);
                 }
             }
         } else { // prod分支
+            // begin annotation freedom 111
             for (Object item : commitsJsonArray) {
                 ProdBranchRecords prodBranchRecords = new ProdBranchRecords();
                 prodBranchRecords.setBefore(before);
@@ -312,33 +276,8 @@ public class GitHubWebHookController {
                 prodBranchRecords.setCreateTime(new Date());
                 prodBranch.insert(prodBranchRecords);
             }
+            // end annotation freedom 111
         }
-    }
-
-    /**
-     * 执行shell脚本
-     */
-    private List<String> runCommand2(String webhookShellPath, ResultProcessor processor, String projectName) {
-        List<String> resultList = new ArrayList<String>();
-        String[] cmds = {"/bin/sh", "-c", webhookShellPath};
-        Process pro = null;
-        try {
-            pro = Runtime.getRuntime().exec(cmds);
-            pro.waitFor();
-            InputStream in = pro.getInputStream();
-            BufferedReader read = new BufferedReader(new InputStreamReader(in));
-            String line = null;
-            while ((line = read.readLine()) != null) {
-                // resultList需要返回给用户的内容（可定制），line为执行完shell脚本后返回的数据，遍历的每行的内容
-                processor.process(resultList, line);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        return resultList;
     }
 
     /**
@@ -474,7 +413,8 @@ public class GitHubWebHookController {
     }
 
     public void checkNotify(String errorMsg) {
-        // todo 邮件通知
+        // 邮件通知
+        mailUtil.sendMail("18516314504@163.com", "参数校验错误", errorMsg);
         System.out.println(errorMsg);
     }
 
