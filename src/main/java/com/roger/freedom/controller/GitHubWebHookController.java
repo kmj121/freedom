@@ -99,7 +99,7 @@ public class GitHubWebHookController {
         // commit信息：用户的每次提交，以及merge也作为一次提交，区别在于commits[][distinct]值，如果是merge，则为true，否则为false
         JSONArray commitsJsonArray = jsonObject.getJSONArray("commits");
         // 校验参数
-        if (checkCommits(commitsJsonArray)) {
+        if (!checkCommits(commitsJsonArray)) {
             checkNotify("webhook传入参数错误，request中取出json中commits参数错误");
             return;
         }
@@ -401,11 +401,11 @@ public class GitHubWebHookController {
             String commitId = commitJsonObject.getOrDefault("id", "").toString();
             Boolean distinct = (Boolean) commitJsonObject.get("distinct");
             if (StringUtils.isBlank(commitId)) {
-                // todo commitId错误
+                LOG.info("commitId为空或者null");
                 return false;
             }
             if (distinct == null) {
-                // todo distinct错误
+                LOG.info("commitId为空或者null");
                 return false;
             }
         }
