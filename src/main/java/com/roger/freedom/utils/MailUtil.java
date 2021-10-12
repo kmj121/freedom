@@ -28,16 +28,11 @@ public class MailUtil {
      * @param text    纯文本内容
      */
     public void sendMail(String to, String subject, String text) {
-        System.out.println("=====sendMail begin");
         SimpleMailMessage message = new SimpleMailMessage();
-        System.out.println("=====sendMail begin 11111");
-
         message.setFrom(from);
         message.setTo(to);
         message.setSubject(subject);
         message.setText(text);
-        System.out.println("=====sendMail begin 22222");
         javaMailSender.send(message);
-        System.out.println("=====sendMail begin 33333");
     }
 }
