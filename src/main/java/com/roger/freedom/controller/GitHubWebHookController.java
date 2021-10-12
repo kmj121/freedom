@@ -237,8 +237,8 @@ public class GitHubWebHookController {
                     continue;
                 }
                 // 确保每一个标志都是唯一的
-                List<String> beginList = contentList.stream().filter(u -> u.equals(item.getBeginAnnotation())).collect(Collectors.toList());
-                List<String> endList = contentList.stream().filter(u -> u.equals(item.getEndAnnotation())).collect(Collectors.toList());
+                List<String> beginList = contentList.stream().filter(u -> u.trim().equals(item.getBeginAnnotation())).collect(Collectors.toList());
+                List<String> endList = contentList.stream().filter(u -> u.trim().equals(item.getEndAnnotation())).collect(Collectors.toList());
                 // 校验开始标志结束标志
                 if (CollectionUtils.isEmpty(beginList) || beginList.size() > 1
                         || CollectionUtils.isEmpty(endList) || endList.size() > 1) {
