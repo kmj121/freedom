@@ -60,7 +60,7 @@ public class GitHubWebHookController {
      * # 2. clone，拉取下来所有分支的代码到本地仓库，并且默认拉取master分支代码到本地工作区，并且创建本地master分支
      *   git clone http://kanmeijie:kmj123456@17zhiliao.com:8088/bgcheck/ewe-bgcheck.git
      * # 3. 进入git项目
-     * cd ewe-bgcheck
+     *   cd ewe-bgcheck
      * # 4. 从本地仓库拉取远程prod分支的代码，并创建本地分支prod
      * git checkout -b prod origin/prod
      *
