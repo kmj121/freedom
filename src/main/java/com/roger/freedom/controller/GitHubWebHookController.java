@@ -219,7 +219,7 @@ public class GitHubWebHookController {
                     LOG.info("维护的文件不存在，可能被删除了");
                     continue;
                 }
-                // todo 读取文件内容
+                // 读取文件内容
                 Map resultMap = readFileIntoStringArrList(file);
                 // 读取内容出错
                 if ("9999".equals(resultMap.get("code"))) {
