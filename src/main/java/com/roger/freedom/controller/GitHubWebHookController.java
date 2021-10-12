@@ -285,6 +285,7 @@ public class GitHubWebHookController {
                 prodBranchRecords.setDistinct((Boolean) ((JSONObject) item).get("distinct") == true ? 1 : 0);
                 prodBranchRecords.setCreateTime(new Date());
                 prodBranch.insert(prodBranchRecords);
+
             }
             // end annotation freedom 111
         }
