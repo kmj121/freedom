@@ -251,13 +251,23 @@ public class GitHubWebHookController {
                 Integer beginIndex = contentList.indexOf(beginList.get(0));
                 Integer endIndex = contentList.indexOf(endList.get(0));
                 List<String> subList = contentList.subList(beginIndex + 1, endIndex);
+                if (CollectionUtils.isEmpty(subList)) {
+                    mailUtil.sendMail("18516314504@163.com", "开始标志与结束标志之间没有内容", "开始标志与结束标志之间没有内容");
+                    LOG.info("开始标志与结束标志之间没有内容");
+                    continue;
+                }
 
                 //list转String
                 String contentNew = StringUtils.join(subList.toArray(), "\\n");
                 String contentOld = item.getContent();
                 String md5New = new String(DigestUtils.md5Digest(contentNew.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
-                String md5Old = new String(DigestUtils.md5Digest(contentOld.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
-                if (!md5New.equals(md5Old)) {
+                String md5Old = StringUtils.isBlank(contentOld) ? "" : new String(DigestUtils.md5Digest(contentOld.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
+                if (StringUtils.isBlank(md5Old)) {
+                    // 初始化的内容
+                    LOG.info("初始化的内容");
+                    item.setContent(contentNew);
+                    projectDetailService.updateOne(item);
+                } else if (!md5New.equals(md5Old)) {
                     // 邮件通知，知识库维护内容发生了改变（邮件中写出改变的内容所在的具体文件路径（路径中包含项目的文件夹）），并将新的内容更新到数据库
                     mailUtil.sendMail("18516314504@163.com", "知识库维护内容发生了改变", "文件所在服务器路径：" + item.getFileName());
                     LOG.info("知识库维护内容发生了改变，文件所在服务器路径：" + item.getFileName());
